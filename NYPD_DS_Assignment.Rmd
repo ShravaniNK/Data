@@ -1,0 +1,187 @@
+---
+title: "NYPD_Document"
+author: "MDSD_SB"
+date: '2023-07-12'
+output:
+  pdf_document: default
+  word_document: default
+---
+# NEW YORK SHOOTING INCIDENT DATA REPORT
+
+## In this assignment we took New York Police Department Shooting Indident data from the year 2006-2022 for data analysis.
+
+## PROJECT STEP 1: How to import Dataset in a reproducible manner 
+
+```{r}
+library(readr)
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+dataset <- read_csv(url_in)
+summary(dataset)
+```
+
+### From the summary, we can see there are 2 missing values in the Jurisdiction_code column and 10 missing values in longitude and latitude columns of the dataset.
+
+## PROJECT STEP 2: Tidying and Transforming the data 
+
+## TIDYING
+
+### Code to find out the row numbers of the missing data 
+
+```{r}
+which(is.na(dataset$JURISDICTION_CODE))
+which(is.na(dataset$Latitude ))
+which(is.na(dataset$Longitude))
+```
+
+### Since we have the row numbers with missing data,we impute the missing values by substituting each of them with an estimate.
+
+```{r}
+dataset[3031,'JURISDICTION_CODE']=0.3269
+dataset[19981,'JURISDICTION_CODE']=0.3269
+dataset[1407,  'Latitude'] = 40.74
+dataset[25598, 'Latitude'] = 40.74
+dataset[25599, 'Latitude'] = 40.74
+dataset[25833, 'Latitude'] = 40.74
+dataset[25939, 'Latitude'] = 40.74
+dataset[26274, 'Latitude'] = 40.74
+dataset[26742, 'Latitude'] = 40.74
+dataset[26815, 'Latitude'] = 40.74
+dataset[26876 ,'Latitude'] = 40.74
+dataset[27206, 'Latitude'] = 40.74
+dataset[1407,  'Longitude'] = -73.91  
+dataset[25598, 'Longitude'] = -73.91  
+dataset[25599, 'Longitude'] = -73.91  
+dataset[25833, 'Longitude'] = -73.91  
+dataset[25939, 'Longitude'] = -73.91  
+dataset[26274, 'Longitude'] = -73.91  
+dataset[26742 ,'Longitude'] = -73.91  
+dataset[26815 ,'Longitude'] = -73.91  
+dataset[26876 ,'Longitude'] = -73.91  
+dataset[27206, 'Longitude'] = -73.91 
+```
+
+### We can now see no missing values in the dataset.
+
+```{r}
+summary(dataset)
+head(dataset)
+```
+
+## TRANSFORMING
+
+### Removing unwanted and repeated columns
+
+### Most of the attributes or columns have missing entries which dont contribute much for data exploration, so they were removed.
+```{r}
+library(dplyr)
+
+dataset2 <- dataset 
+dataset2 <- select(dataset, -c(PRECINCT,
+                               LOC_OF_OCCUR_DESC, LOC_CLASSFCTN_DESC,STATISTICAL_MURDER_FLAG,                            
+                               PERP_AGE_GROUP, PERP_SEX, PERP_RACE,
+                               X_COORD_CD, Y_COORD_CD, Latitude, Longitude, Lon_Lat))
+
+#dim(dataset) # 27312    21
+#dim(dataset2) # 27312     9
+head(dataset2)
+
+```
+
+
+## Project Step 3: Visualizations and Analysis 
+
+### 1.Plot a barplot for incident location(BOROUGH)
+
+```{r}
+library(ggplot2)
+ggplot(dataset2,aes(x=BORO, fill= VIC_SEX )) +
+  labs(x = " Borough ",title=" Barplot for incident occurence location ")+
+  geom_bar(position='stack')+
+  scale_fill_manual(values=c('pink','lightblue','grey'))
+
+```
+
+### Analysis
+
+### From the above plot, most of the incidents took place in Brooklyn and Bronx compared to other 3 places. Also the ratio of males victims is higher than female victims.
+
+### 2.Plot a barplot for victims race
+
+```{r}
+library(ggplot2)
+ggplot(dataset2, aes(x=VIC_RACE, fill= VIC_SEX)) +
+  labs(x = " Victims Race ",title=" Barplot for Victims Race ")+
+  geom_bar(position='stack')+
+  scale_fill_manual(values=c('pink','lightblue','grey'))+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+```
+
+### Analysis
+
+### From the above plot, we can say that black people are the highest victims, followed by white hispanic and black hispanic. Racial disparity existence is evident from the plot.
+
+### 3.Plot a barplot for victims age group
+
+```{r}
+ggplot(dataset2[dataset2$VIC_AGE_GROUP!=1022,],aes(x=VIC_AGE_GROUP, fill= VIC_SEX)) + 
+  labs(x = " Victims Age Group ",title=" Barplot for Victims Age Group ")+
+  geom_bar(position='stack')+
+  scale_fill_manual(values=c('pink','lightblue','grey'))
+```
+
+### Analysis
+
+### From the above plot, most of the victims are in the age group of 18-45, due to the fact that they are the most active and independent age group to stay out and engage in various activities.Also most of the victims are males. 
+
+
+### 4. Plot a barplot for victims gender
+
+```{r}
+ggplot(dataset2,aes(x=VIC_SEX, fill= VIC_RACE)) +
+  labs(x = " Victims Gender ",title=" Barplot for Victims Gender ")+
+  geom_bar(position='stack')+
+  scale_fill_manual(values=c('red','yellow','black','blue','grey','white','brown'))
+  
+```
+
+### Analysis
+
+### From the above plot,it is clear that males are the most targetted victims and among them are black race males.Even among the females, even though they are less than males the ratio of balck females is high suggesting them as the targetted race.
+
+
+### How to extract year from the DATE
+
+
+```{r}
+library(lubridate)
+
+dataset2$Year <- format(as.POSIXct(dataset$OCCUR_DATE, format = "%m/%d/%Y "), format="%Y")
+cases_by_boro <- dataset2 %>% group_by(BORO, Year) %>% summarize (Cases = n())
+cases_by_boro
+```
+
+### 5. Plot a barplot for yearly cases
+```{r}
+ggplot(cases_by_boro, aes(x= Year, y = Cases, fill = BORO))+
+  labs(x = " Yearly Cases ",title=" Barplot for Yearwise shootings ")+
+  geom_bar(stat = "identity")+
+  scale_fill_manual(values=c('red','blue','green','yellow','brown'))+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
+### Analysis
+
+### From the above plot,we can see that the number of cases declined between 2017-2019, and again increased during covid pandemic.
+
+
+# Modelling
+```{r}
+glm.fit <- glm(STATISTICAL_MURDER_FLAG ~   PERP_RACE + VIC_RACE + VIC_SEX + VIC_AGE_GROUP , family= binomial, data= dataset )
+#glm.fit <- glm(STATISTICAL_MURDER_FLAG ~ . , family= binomial, data= dataset )               
+summary(glm.fit)
+```
+
+
+## Project Step 4: Conclusions
+
+### From the data we have,it can be concluded that the black males within the age group of 18-45 are mojority of the victims of shooting in the areas of New York. Most of the incidents took place at Brooklyn and Bronx. It is unclear whether the victims are visitors or residents of Newyork. To have a more clear understanding about the magnitude of gun violence, the given data which has lots of missing entries should be filled. Appropriate measures such as increased patrol, awareness of gun violence  should be taken to reduce the number of race related shootings.
