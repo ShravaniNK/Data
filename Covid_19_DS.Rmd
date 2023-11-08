@@ -1,0 +1,664 @@
+---
+title: "Covid_19 Data Analysis Report"
+author: "MSDS_VB"
+date: '2023-07-11'
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+
+# 1. IMPORT COVID_19 DATASET
+
+```{r, echo = FALSE}
+#Loading the tidyverse library
+
+library(tidyverse)
+
+url_in <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
+
+uid_lookup_url <-" https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/UID_ISO_FIPS_LookUp_Table.csv "
+
+
+file_names <- c("time_series_covid19_confirmed_global.csv",
+                "time_series_covid19_deaths_global.csv",
+                "time_series_covid19_confirmed_US.csv",
+                "time_series_covid19_deaths_US.csv"
+               )
+urls <- str_c(url_in, file_names)
+
+urls
+```
+
+```{r, echo = FALSE}
+global_cases  <- read_csv(urls[1])
+global_deaths <- read_csv(urls[2])
+US_cases      <- read_csv(urls[3])
+US_deaths     <- read_csv(urls[4])
+
+dim(global_cases)
+dim(global_deaths)
+dim(US_cases)
+dim(US_deaths)
+```
+# 2.TIDYING THE DATASET
+
+## Working on global cases data 
+
+```{r}
+head(global_cases)
+```
+## Converting the data from wide format to a long format and tidying by removing lat and long 
+
+```{r}
+library(lubridate)
+global_cases <- global_cases %>%
+    pivot_longer(cols = -c('Province/State',
+                          'Country/Region', Lat, Long),
+                 names_to = "date",
+                 values_to = "cases") %>%
+    select(-c(Lat, Long))
+
+head(global_cases)
+
+```
+
+## Checking to see if there are any negative values in cases
+
+```{r}
+global_cases %>% filter(cases < 0)
+```    
+### There are no negative values in global cases data
+
+## Working on global deaths data
+
+```{r}
+head(global_deaths)
+```
+
+## Converting the data from wide format to a long format and tidying by removing lat and long 
+
+```{r}             
+global_deaths <- global_deaths %>%
+  pivot_longer(cols = -c('Province/State',
+                         'Country/Region', Lat, Long),
+               names_to = "date",
+               values_to = "deaths") %>%
+  select(-c(Lat, Long))
+
+head(global_deaths)
+```
+
+## Checking to see if there are any negative values in deaths
+
+```{r}
+global_deaths %>% filter(deaths < 0)
+```    
+### There are no negative values in global deaths data
+
+## Joining global_cases and global_deaths into one global data for data exploration analysis
+
+```{r}
+global <- global_cases %>%
+    full_join(global_deaths) %>%
+    rename(`Country_Region` = `Country/Region`) %>%
+    mutate(date = mdy(date))
+    
+global
+```
+```{r}
+unique(global$Country_Region)
+```
+
+### Out of 201 unique countries list,I found two names (Summer Olympics 2020,Winter Olympics 2022) which doesn't make sense as Country or Region. So I removed it from the dataframe.
+
+```{r}
+global <- global %>%
+  filter(!(Country_Region == 'Summer Olympics 2020') & !(Country_Region == 'Winter Olympics 2022'))
+
+global 
+```
+
+## Global data after filtering the cases to more than 1
+```{r}
+global <- global %>% filter(cases>0)
+head(global)
+```
+
+## Country wise cases and deaths count
+```{r}
+new_global <-global %>% group_by(Country_Region) %>%
+  summarise(total_cases= sum(cases),
+            total_deaths = sum(deaths))
+new_global
+```
+
+## Countries with high number of deaths 
+
+```{r}
+new_global1 <- new_global %>% arrange(desc(total_deaths))
+new_global1
+```
+### US has highest number of deaths recorded followed by Brazil.
+
+## Countries with high number of cases 
+
+```{r}
+new_global2 <- new_global %>% arrange(desc(total_cases))
+new_global2
+```
+### US has high number of cases recorded followed by India.
+
+## Countries with low number of deaths
+
+```{r}
+new_global3 <- new_global %>% arrange(total_deaths)
+new_global3
+```
+### There are no deaths recorded in countries like Antartica, Holy See and Tuvalu. This may be either due to not being reported or counted as covid related deaths which may include bias in the data.
+
+## Countries with low number of cases 
+```{r}
+new_global4 <- new_global %>% arrange(total_cases)
+new_global4
+```
+### North Korea has least cases recorded, but deaths are way more than cases which clearly indicates improper data acquisition. In ideal cases cases should be more than deaths. 
+
+## Yearwise global cases and deaths of 199 countries
+
+```{r}
+global_year <- global %>%
+  mutate(year = format(date,"%Y")) %>%
+  group_by(year) %>%
+  summarise(total_cases = sum(cases) , total_deaths = sum(deaths))
+
+global_year
+```
+
+## Visualize barplot for total cases over the 4 years on global data
+
+```{r}
+global_year %>%
+  ggplot(aes(x= year, y = total_cases)) +
+  geom_bar(fill="darkseagreen",stat="identity")
+ 
+```
+
+## Visualize barplot for total deaths over the 4 years on global data
+
+```{r}
+global_year %>%
+  ggplot(aes(x= year, y = total_deaths)) +
+  geom_bar(fill="darkseagreen",stat="identity")
+
+```
+## Visualize barplot for total cases and deaths together over the 4 years on global data
+
+```{r}
+df_long <- global_year %>%
+  pivot_longer(cols=-year, names_to ="Type", values_to = "Count") 
+
+df_long
+
+
+df_long %>%
+  ggplot(aes(x=year, y= Count , fill= Type))+
+  geom_col(position="dodge")+
+  geom_text(aes(label = Count), vjust = -0.2)
+```
+
+### From the plot, we can see year 2022 has highest number of cases recorded globally due to dangerous variants like Delta and Omicron.
+
+## Populatin of each country 
+
+```{r}
+
+uid_lookup_url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/UID_ISO_FIPS_LookUp_Table.csv"
+
+
+uid <- read_csv(uid_lookup_url) %>%
+      select(-c(Lat, Long_, Combined_Key, code3, iso2, iso3, Admin2))
+
+uid
+```
+
+
+## Removing missing entries in the Population column
+```{r}
+uid <- uid %>%
+  filter(!is.na(Population))
+  
+uid
+```
+## Removing the first 3 columns from the Population dataset to simplify.
+
+```{r}
+uid <- uid %>%
+  select(-c(Province_State,UID,FIPS))
+
+uid
+```
+
+## Group by Country to get total population of each Country
+```{r}
+new_uid <-uid %>% 
+  group_by(Country_Region) %>%
+  summarise(TotalPopulation= sum(Population))
+
+new_uid
+```
+
+## Joining the population column from the new_uid to the new_global data by each country
+
+```{r}
+new_global <- new_global %>%
+  left_join(new_uid, by = c("Country_Region")) %>%
+  select( Country_Region, 
+         total_cases, total_deaths,TotalPopulation)
+
+new_global
+```
+### Here population of Antartica and Diamond Princess are not recorded. Also I found another entry listed as "MS Zaandam" which is a cruise ship. So I chose to remove the 3 entries. 
+
+## Remove missing entries from the total population column
+
+```{r}
+new_global <- new_global %>%
+  filter(!is.na(TotalPopulation))
+  
+new_global
+```
+
+## Deaths per million for each Country(Mortality Rate)
+
+```{r}
+global_by_country <- new_global %>%
+  mutate(deaths_per_mill = (total_deaths* 1000000) / TotalPopulation) %>%
+  select(Country_Region,
+         total_cases, total_deaths, TotalPopulation, deaths_per_mill) %>%
+  ungroup()
+
+global_by_country %>% arrange(desc(deaths_per_mill))
+```
+### Bulgaria has high covid mortality rate.
+
+## Rate of deaths per cases (Case Fatality Rate)
+```{r}
+new_global1 <- new_global %>%
+  mutate(death_rate = (total_deaths*100) / total_cases) %>%
+  select(Country_Region,
+          TotalPopulation, total_cases, total_deaths, death_rate) %>%
+  ungroup()
+
+new_global1 %>% arrange(desc(death_rate))
+```
+### Clearly North Korea is an outlier in this case.
+
+
+## WORKING ON US CASES AND DEATHS
+
+```{r}
+head(US_cases)
+```
+
+## Converting the data from wide format to a long format
+
+```{r}
+US_cases <- US_cases %>%
+       pivot_longer(cols = -c(UID:Combined_Key),
+              names_to = "date", 
+              values_to = "cases") %>%
+      select(Admin2: cases) %>%
+      select(-c(Lat,Long_))
+
+head(US_cases)
+```
+## Checking to see if there are any negative values in cases
+```{r, echo = FALSE}
+US_cases %>% filter(cases < 0)
+```
+### There are 3 rows with nagative cases. I chose to remove them from the dataset by filtering cases to greater than 0.
+
+## Further tidying up US_cases
+
+```{r}
+US_cases <- US_cases %>%
+  filter(cases > 0) %>%
+  select(-c(Combined_Key))
+
+US_cases  
+```
+
+## Cases per state
+```{r}
+US_cases_state <- US_cases %>%
+  group_by(Province_State) %>%
+  summarise(total_cases= sum(cases)) %>%
+  select(Province_State,total_cases)
+
+US_cases_state
+```
+
+## Working on US deaths
+
+```{r, echo= FALSE}
+head(US_deaths)
+```
+
+## Converting the data from wide format to a long format
+
+```{r, echo= FALSE}
+US_deaths <- US_deaths %>%
+       pivot_longer(cols = -c(UID:Population),
+              names_to = "date", 
+              values_to = "deaths") %>%
+      select(Admin2: deaths) %>%
+      select(-c(Lat,Long_))
+
+head(US_deaths)
+
+```
+## Checking to see if there are any negative values in cases
+```{r, echo = FALSE}
+US_deaths %>% filter(deaths < 0)
+```
+### There are 3 rows with negative entries, so I chose to filter the data by deaths greater than or equal to 0.
+
+## Further tidying up US_deaths
+
+```{r}
+US_deaths <- US_deaths %>%
+  filter(deaths >= 0) %>%
+  select(-c(Combined_Key))
+
+```
+
+```{r}
+US_deaths
+```
+
+## Lets count population of each state
+```{r}
+pop_state <- US_deaths %>%
+  select(Admin2, Province_State, Population)
+
+pop_state <- distinct(pop_state)
+pop_state
+```
+## Total Population of each state and filtering out rows with missing population total entries
+```{r}
+pop_state <- pop_state %>%
+  group_by(Province_State) %>%
+  summarise(Total_Population = sum(Population)) %>%
+  select(Province_State, Total_Population)
+
+pop_state <- pop_state %>% filter(Total_Population >0)
+pop_state
+```
+
+## Deaths per state
+
+```{r}
+US_deaths_state <- US_deaths %>%
+  group_by(Province_State) %>%
+  summarise(total_deaths= sum(deaths))
+
+US_deaths_state
+```
+
+## Join US_cases_state and US_deaths_state
+
+```{r}
+US <- US_cases_state %>%
+  full_join(US_deaths_state)
+  
+US
+```
+
+## Add Population column
+```{r}
+US <- US %>%
+  left_join(pop_state, by = c("Province_State")) %>%
+  select( Province_State, 
+         total_cases, total_deaths,Total_Population)
+
+US
+```
+### I found two names under Province_state column(Diamond Princess,Grand Princess). They are cruise ships and not states, So I removed it from the dataframe.
+
+```{r, echo= FALSE}
+US <- US %>%
+  filter(!(Province_State == 'Diamond Princess') & !(Province_State == 'Grand Princess'))
+
+US 
+```
+
+## States with high deaths
+
+```{r, echo= FALSE}
+US %>% arrange(desc(total_deaths))
+
+```
+
+## States with high cases
+
+```{r, echo= FALSE}
+US %>% arrange(desc(total_cases))
+
+```
+## States with less deaths
+
+```{r, echo= FALSE}
+US %>% arrange(total_deaths)
+
+```
+
+## States with less cases
+
+```{r, echo= FALSE}
+US %>% arrange(total_cases)
+
+```
+
+## Joining the actual US_cases and US_deaths for further analysis and modeling
+```{r, echo= FALSE}
+US_Total <- US_cases %>%
+    full_join(US_deaths) %>%
+    mutate(date = mdy(date))
+    
+US_Total
+```
+```{r}
+US_year <- US_Total %>%
+  select(date,cases,deaths)
+  
+US_year
+```
+
+
+```{r}
+US_year <- US_year %>%
+  mutate(year = format(date,"%Y")) %>%
+  group_by(year) %>%
+  summarise(total_cases = sum(cases, na.rm=T) , total_deaths = sum(deaths))
+
+US_year
+```
+
+
+## Visualize barplot for total cases over the 4 years on global data
+
+```{r}
+US_year %>%
+  ggplot(aes(x= year, y = total_cases)) +
+  geom_bar(fill="darkseagreen",stat="identity")
+ 
+```
+
+## Visualize barplot for total deaths over the 4 years on global data
+
+```{r}
+US_year %>%
+  ggplot(aes(x= year, y = total_deaths)) +
+  geom_bar(fill="darkseagreen",stat="identity")
+
+```
+## Visualize barplot for total cases and deaths together over the 4 years on global data
+
+```{r}
+df_US <- US_year %>%
+  pivot_longer(cols=-year, names_to ="Type", values_to = "Count") 
+
+
+df_US %>%
+  ggplot(aes(x=year, y= Count , fill= Type))+
+  geom_col(position="dodge")+
+  geom_text(aes(label = Count), vjust = -0.2)
+```
+
+### From the plot, we can see year 2022 has highest number of cases recorded in the US.
+
+
+```{r}
+US_Total
+```
+
+## Deaths per million by state
+```{r, echo= FALSE}
+library(dplyr)
+
+US_by_state <- US_Total %>%
+  group_by(Province_State, Country_Region, date) %>%
+  summarize(cases = sum(cases, na.rm=T), deaths = sum(deaths),
+            Population = sum(Population)) %>%
+  mutate(deaths_per_mill = deaths * 1000000 / Population) %>%
+  select(Province_State, Country_Region, date,
+         cases, deaths, deaths_per_mill, Population) %>%
+  ungroup()
+
+US_by_state
+```
+
+## US totals
+
+```{r, echo= FALSE}
+US_totals <- US_by_state %>%
+  group_by(Country_Region, date) %>%
+  summarize(cases = sum(cases, na.rm=T), deaths = sum(deaths),
+            Population = sum(Population)) %>%
+  mutate(deaths_per_mill = deaths*1000000 / Population) %>%
+  select(Country_Region, date,
+         cases, deaths, deaths_per_mill, Population) %>%
+  ungroup()
+
+US_totals
+```
+
+# Visualize the time seriesgraph of covid data in US
+
+```{r, echo= FALSE}
+US_totals %>%
+  filter(cases > 0) %>%
+  ggplot(aes(x = date, y = cases)) +
+  geom_line(aes(color = "cases")) +
+  geom_point(aes(color = "cases")) +
+  geom_line(aes(y = deaths, color = "deaths"))+
+  geom_point(aes(y = deaths, color = "deaths"))+
+  scale_y_log10() +
+  theme(legend.position = "bottom", 
+        axis.text.x = element_text(angle = 45)) +
+  labs(title = "COVID 19 in US", y = NULL)
+  
+```  
+
+## Visualize Washington state covid data
+
+```{r, echo= FALSE}
+state <- "Washington"
+US_by_state %>%
+  filter(Province_State == state) %>%
+  filter(cases > 0) %>%
+  ggplot(aes(x = date, y = cases)) +
+  geom_line(aes(color = "cases")) +
+  geom_point(aes(color = "cases")) +
+  geom_line(aes(y = deaths, color = "deaths"))+
+  geom_point(aes(y = deaths, color = "deaths"))+
+  scale_y_log10() +
+  theme(legend.position = "bottom", 
+        axis.text.x = element_text(angle = 45)) +
+  labs(title = str_c("COVID 19 in", state), y = NULL)
+```
+
+## Adding new variables for analysis
+
+```{r, echo= FALSE}
+US_by_state <- US_by_state %>%
+  mutate(new_cases = cases - lag(cases),
+         new_deaths = deaths - lag(deaths))
+
+US_totals <- US_totals %>%
+  mutate(new_cases = cases - lag(cases), 
+         new_deaths = deaths - lag(deaths))
+
+tail(US_totals %>% select(new_cases, new_deaths, everything()))
+```
+
+
+## 10 states with less deaths per thousand
+
+```{r, echo= FALSE}
+US_state_totals <- US_by_state %>%
+  group_by(Province_State) %>%
+  summarize(deaths = max(deaths), cases = max(cases), 
+            population = max(Population), 
+            cases_per_thou = 1000* cases / population, 
+            deaths_per_thou = 1000* deaths / population) %>%
+  filter(cases >0,  population > 0)
+
+US_state_totals %>%
+  slice_min(deaths_per_thou, n = 10)
+```
+
+## 10 states with highest deaths per thousand
+
+```{r, echo= FALSE}
+US_state_totals %>%
+  slice_max(deaths_per_thou, n = 10)
+```
+
+
+# MODELLING
+
+## Linear Model
+
+```{r, echo= FALSE}
+mod <- lm(deaths_per_thou ~ cases_per_thou, data = US_state_totals)
+
+summary(mod)
+```
+
+```{r, echo= FALSE}
+x_grid <- seq(1,151)
+new_df <- tibble(cases_per_thou = x_grid)
+US_state_totals %>% mutate(pred= predict(mod))
+```
+## US totals with prediction
+
+```{r, echo= FALSE}
+US_tot_w_pred <- US_state_totals %>% mutate(pred= predict(mod))
+US_tot_w_pred 
+```
+
+# Model Plot 
+
+```{r, echo= FALSE}
+US_tot_w_pred %>% 
+  ggplot() +
+  geom_point(aes(x = cases_per_thou, y = deaths_per_thou), color = "blue") +
+  geom_point(aes(x = cases_per_thou, y = pred), color = "red")
+```
+ 
+#  Analysis 
+## The Model linearly predicted the deaths per the number of cases which is statistically significant.
+
