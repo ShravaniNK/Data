@@ -8,7 +8,6 @@ output:
   word_document: default
 ---
 
-
 # 1. IMPORT COVID_19 DATASET
 
 ```{r, echo = FALSE}
@@ -460,6 +459,21 @@ US %>% arrange(total_deaths)
 US %>% arrange(total_cases)
 
 ```
+# Model Plot of total cases and deaths
+
+```{r, echo= FALSE}
+mod1<- lm(total_deaths ~ total_cases, data = US)
+summary(mod1)
+
+US %>% 
+  ggplot() +
+  geom_point(aes(x = total_cases, y = total_deaths), color = "blue") +
+  geom_point(aes(x = total_cases, y = predict(mod1)), color = "red")
+```
+ 
+#  Analysis 
+## The models predictions are linear and a higher R-squared indicates the model is a good fit.
+
 
 ## Joining the actual US_cases and US_deaths for further analysis and modeling
 ```{r, echo= FALSE}
@@ -518,7 +532,6 @@ df_US %>%
 ```
 
 ### From the plot, we can see year 2022 has highest number of cases recorded in the US.
-
 
 ```{r}
 US_Total
@@ -634,14 +647,15 @@ US_state_totals %>%
 
 ```{r, echo= FALSE}
 mod <- lm(deaths_per_thou ~ cases_per_thou, data = US_state_totals)
-
 summary(mod)
 ```
 
+## US state totals 
 ```{r, echo= FALSE}
 x_grid <- seq(1,151)
 new_df <- tibble(cases_per_thou = x_grid)
 US_state_totals %>% mutate(pred= predict(mod))
+US_state_totals
 ```
 ## US totals with prediction
 
@@ -650,15 +664,14 @@ US_tot_w_pred <- US_state_totals %>% mutate(pred= predict(mod))
 US_tot_w_pred 
 ```
 
-# Model Plot 
-
+## Model plot for cases per thousand vs deaths per thousand
 ```{r, echo= FALSE}
-US_tot_w_pred %>% 
+US_tot_w_pred  %>% 
   ggplot() +
   geom_point(aes(x = cases_per_thou, y = deaths_per_thou), color = "blue") +
   geom_point(aes(x = cases_per_thou, y = pred), color = "red")
-```
- 
-#  Analysis 
-## The Model linearly predicted the deaths per the number of cases which is statistically significant.
 
+```
+
+## Analysis
+### From the summary, adjusted R square of 0.3 means the model does not explain significant portion of variance in the deaths per thousand which may have been due to presence of oultiers. 
