@@ -29,6 +29,7 @@ length(unique(dataset$INCIDENT_KEY))
 summary(dataset)
 ```
 
+
 # STEP 2: Tidying and Transforming the data 
 
 ## Most of the attributes or columns have missing entries which dont contribute much for data exploration, so they were removed.
@@ -36,12 +37,14 @@ summary(dataset)
 library(dplyr)
 
 dataset2 <- dataset %>% 
-  select(-c(PRECINCT,JURISDICTION_CODE, 
+  select(-c(LOC_OF_OCCUR_DESC, PRECINCT, JURISDICTION_CODE,
+            LOC_CLASSFCTN_DESC, LOCATION_DESC,
+            PERP_AGE_GROUP, PERP_SEX, PERP_RACE,
             X_COORD_CD, Y_COORD_CD, Latitude, Longitude, Lon_Lat))
 
 
 head(dataset2)
-#dim(dataset2) # 27312     14
+#dim(dataset2) # 27312     8
 ```
 
 ## Summary of the dataset2
@@ -52,71 +55,18 @@ summary(dataset2)
 ## Checking categorical and logical attributes
 ```{r}
 unique(dataset2$BORO)
-unique(dataset2$LOC_OF_OCCUR_DESC)
-unique(dataset2$LOC_CLASSFCTN_DESC)
-unique(dataset2$LOCATION_DESC)
 unique(dataset2$STATISTICAL_MURDER_FLAG)
-unique(dataset2$PERP_AGE_GROUP) 
-unique(dataset2$PERP_SEX) 
-unique(dataset2$PERP_RACE)
 unique(dataset2$VIC_AGE_GROUP) 
 unique(dataset2$VIC_SEX) 
 unique(dataset2$VIC_RACE) 
 ```
 
-## Replacing NA's with UNKNOWN class 
+## Replacing wrong entries with "UNKNOWN" 
 ```{r}
-dataset2$LOC_OF_OCCUR_DESC <- dataset2$LOC_OF_OCCUR_DESC %>% replace_na("UNKNOWN")
-dataset2$LOC_CLASSFCTN_DESC <- dataset2$LOC_CLASSFCTN_DESC %>% replace_na("UNKNOWN")
-dataset2$LOCATION_DESC <- dataset2$LOCATION_DESC %>% replace_na("UNKNOWN")
-dataset2$PERP_AGE_GROUP <- dataset2$PERP_AGE_GROUP %>% replace_na("UNKNOWN")
-dataset2$PERP_SEX <- dataset2$PERP_SEX %>% replace_na("U")
-dataset2$PERP_RACE <- dataset2$PERP_RACE %>% replace_na("UNKNOWN")
-```
-
-## Checking 
-```{r}
-unique(dataset2$LOC_OF_OCCUR_DESC)
-unique(dataset2$LOC_CLASSFCTN_DESC)
-unique(dataset2$LOCATION_DESC)
-unique(dataset2$PERP_AGE_GROUP) 
-unique(dataset2$PERP_SEX) 
-unique(dataset2$PERP_RACE)
-unique(dataset$VIC_AGE_GROUP) 
-```
-
-## Replacing (null) and wrong entries with UNKNOWN class 
-```{r}
-
-dataset2$LOCATION_DESC[dataset2$LOCATION_DESC == "(null)"] <- "UNKNOWN"
-
-dataset2$PERP_AGE_GROUP[dataset2$PERP_AGE_GROUP == "(null)"] <- "UNKNOWN"
-dataset2$PERP_AGE_GROUP[dataset2$PERP_AGE_GROUP == "940"] <- "UNKNOWN"
-dataset2$PERP_AGE_GROUP[dataset2$PERP_AGE_GROUP == "224"] <- "UNKNOWN"
-dataset2$PERP_AGE_GROUP[dataset2$PERP_AGE_GROUP == "1020"] <- "UNKNOWN"
-
-dataset2$PERP_SEX[dataset2$PERP_SEX == "(null)"] <- "U"
-
-dataset2$PERP_RACE[dataset2$PERP_RACE == "(null)"] <- "UNKNOWN"
-
 dataset2$VIC_AGE_GROUP[dataset2$VIC_AGE_GROUP == "1022"] <- "UNKNOWN"
+unique(dataset2$VIC_AGE_GROUP)
 ```
 
-## Re-Checking 
-```{r}
-unique(dataset2$BORO)
-unique(dataset2$LOC_OF_OCCUR_DESC)
-unique(dataset2$LOC_CLASSFCTN_DESC)
-unique(dataset2$LOCATION_DESC)
-unique(dataset2$STATISTICAL_MURDER_FLAG)
-unique(dataset2$PERP_AGE_GROUP) 
-unique(dataset2$PERP_SEX) 
-unique(dataset2$PERP_RACE)
-unique(dataset2$VIC_AGE_GROUP) 
-unique(dataset2$VIC_SEX) 
-unique(dataset2$VIC_RACE)
-```
-## I have replaced all NA's, null's and wrong entries with UNKNOWN and the dataset is ready for EDA.
 
 ## STEP 3: Visualizations and Analysis 
 
@@ -227,7 +177,6 @@ head(dataset2)
 
 ```{r}
 library(lubridate)
-
 dataset2$Year <- format(as.POSIXct(dataset2$OCCUR_DATE, format = "%m/%d/%Y "), format="%Y")
 cases_by_boro <- dataset2 %>% group_by(BORO, Year) %>% summarize (Cases = n())
 cases_by_boro
@@ -292,7 +241,7 @@ head(dataset2)
 
 # Modelling-Logistic regression
 ```{r}
-glm_fit <- glm(STATISTICAL_MURDER_FLAG ~ Interval + VIC_AGE_GROUP +VIC_SEX + VIC_RACE , family= binomial, data= dataset2 )
+glm_fit <- glm(STATISTICAL_MURDER_FLAG ~ Interval + VIC_AGE_GROUP + VIC_SEX + VIC_RACE , family= binomial, data= dataset2 )
 summary(glm_fit)
 ```
 ## Interpret Results - P-values less than 0.05 suggest that there is a statistically significant association between the response variable and Interval plus victim age group.
